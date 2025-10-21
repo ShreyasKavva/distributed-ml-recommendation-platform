@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: recommendation-platform
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:recplatform}
+    username: ${DB_USER:recplatform}
+    password: ${DB_PASSWORD:recplatform}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+
+  cache:
+    type: redis
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: recommendation-platform
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+
+app:
+  ingestion:
+    enabled: false
+    data-path: ${INGESTION_DATA_PATH:./data}
+    batch-size: 1000
+  recommendation:
+    weights:
+      content: 0.4
+      collaborative: 0.35
+      realtime-popularity: 0.25
+  kafka:
+    topics:
+      user-activity: user-activity-events
+
+logging:
+  level:
+    com.recplatform: INFO

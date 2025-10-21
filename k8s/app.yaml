@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rec-platform-config
+  namespace: rec-platform
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: recplatform
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  ES_URIS: http://elasticsearch:9200
+---
+# NOTE: plaintext for demo purposes only. In a real deployment this would come
+# from a secrets manager (e.g. External Secrets Operator, Sealed Secrets, or
+# your cloud provider's secret store) - never committed to git as plaintext.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rec-platform-secrets
+  namespace: rec-platform
+type: Opaque
+stringData:
+  DB_USER: recplatform
+  DB_PASSWORD: change-me-in-production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rec-platform-api
+  namespace: rec-platform
+  labels:
+    app: rec-platform-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rec-platform-api
+  template:
+    metadata:
+      labels:
+        app: rec-platform-api
+    spec:
+      containers:
+        - name: rec-platform-api
+          image: rec-platform-api:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: rec-platform-config
+            - secretRef:
+                name: rec-platform-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rec-platform-api
+  namespace: rec-platform
+spec:
+  selector:
+    app: rec-platform-api
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+# minReplicas 3 -> maxReplicas 30 gives headroom for a 10x traffic surge.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rec-platform-api-hpa
+  namespace: rec-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rec-platform-api
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120

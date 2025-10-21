@@ -1,0 +1,34 @@
+# Build output
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local env / secrets
+.env
+.env.local
+
+# Yelp Open Dataset - large, separately licensed, don't commit it
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.sh
+*.zip
